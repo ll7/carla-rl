@@ -1,0 +1,19 @@
+name: carla-rl-37
+channels:
+  - pytorch-nightly # for pytorch sm86
+  - conda-forge
+dependencies:
+  - python=3.7
+  - pytorch
+  - torchvision
+  - cudatoolkit=11.3
+  - jupyterlab
+  - numpy
+  - pandas
+  - matplotlib
+  - gym-all
+  - pip
+  - pip:
+    - stable-baselines3[extra]
+    - pygame # trouble to install via conda
+    - carla==0.9.12 # https://pypi.org/project/carla/#history
