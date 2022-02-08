@@ -3,7 +3,7 @@
 ## preperation
 
 - Download Carla
-- Install wheel package
+- use pip carla api
 
 
 `conda env create -f environment.yml`
@@ -14,3 +14,4 @@
 conda activate myenv
 conda env update --file local.yml --prune
 ```
+
