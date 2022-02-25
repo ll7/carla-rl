@@ -18,6 +18,7 @@ def main():
         client.set_timeout(2.0)
         
         world = client.get_world()
+        world = client.load_world('Town01')
         
         blueprint_library = world.get_blueprint_library()
         
@@ -45,7 +46,7 @@ def main():
         
         seg_camera_bp = blueprint_library.find('sensor.camera.semantic_segmentation')
         
-        camera_transform = carla.Transform(carla.Location(z=5.0), carla.Rotation(pitch=-90.0))
+        camera_transform = carla.Transform(carla.Location(z=2.0), carla.Rotation(pitch=-90.0))
         
         seg_camera_bp.set_attribute('image_size_x', '128')
         seg_camera_bp.set_attribute('image_size_y', '128')
