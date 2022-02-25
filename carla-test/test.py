@@ -4,12 +4,17 @@ import carla
 import random
 import time
 from datetime import datetime
+import logging
+logger = logging.getLogger()
+logger.setLevel(logging.DEBUG)
+
+
 
 def main():
-    print("main")
-    print("Using the following egg file: \n" + carla.__file__)
+    logging.info("main")
+    logging.info("Using the following egg file: \n" + carla.__file__)
     now = datetime.now().strftime('%Y-%m-%d_%H%M')
-    print(now)
+    logging.info(now)
     
     actor_list = []
     
@@ -22,10 +27,10 @@ def main():
         world = client.get_world()
         map = world.get_map()
         if not map.name.endswith(desired_town):
-            print("We want to use {}, but the map is named {}".format(desired_town, map.name))
+            logging.info("We want to use {}, but the map is named {}".format(desired_town, map.name))
             world = client.load_world('Town01')
             time.sleep(5)
-            print("Map {} loaded".format(map.name))
+        logging.info("Map {} loaded".format(map.name))
             
         
         blueprint_library = world.get_blueprint_library()
@@ -37,7 +42,7 @@ def main():
         walker = world.spawn_actor(bp, transform)
         
         actor_list.append(walker)
-        print('created %s' % walker.type_id)
+        logging.debug('created %s' % walker.type_id)
         
         # set spectator as top down view
         
@@ -65,19 +70,19 @@ def main():
         
         
         actor_list.append(camera)
-        print('created %s' % camera.type_id)
+        logging.debug('created %s' % camera.type_id)
         
         camera.listen(lambda image: image.save_to_disk('./tmp/{}/{}.png'.format(now, image.frame_number), carla.ColorConverter.CityScapesPalette))
         
         time.sleep(10)
         
     finally:
-        print('finally')
-        print(camera)
+        logging.debug('finally')
+        logging.debug(camera)
         camera.destroy()
         client.apply_batch([carla.command.DestroyActor(x) for x in actor_list])
-        print(camera)
-        print('done.')
+        logging.debug(camera)
+        logging.debug('done.')
         
 
     
