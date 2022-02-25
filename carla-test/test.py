@@ -1,12 +1,15 @@
-#!/usr/bin python
+#!/usr/bin python3
 
 import carla
 import random
 import time
+from datetime import datetime
 
 def main():
     print("main")
     print("Using the following egg file: \n" + carla.__file__)
+    now = datetime.now().strftime('%Y-%m-%d_%H%M')
+    print(now)
     
     actor_list = []
     
@@ -44,12 +47,18 @@ def main():
         
         camera_transform = carla.Transform(carla.Location(z=5.0), carla.Rotation(pitch=-90.0))
         
+        seg_camera_bp.set_attribute('image_size_x', '128')
+        seg_camera_bp.set_attribute('image_size_y', '128')
+        seg_camera_bp.set_attribute('fov', '170.0')
+        
         camera = world.spawn_actor(seg_camera_bp, camera_transform, attach_to=vehicle)
+        
+        
         
         actor_list.append(camera)
         print('created %s' % camera.type_id)
         
-        camera.listen(lambda image: image.save_to_disk('./tmp/%s.png' % image.frame_number, carla.ColorConverter.CityScapesPalette))
+        camera.listen(lambda image: image.save_to_disk('./tmp/{}/{}.png'.format(now, image.frame_number), carla.ColorConverter.CityScapesPalette))
         
         time.sleep(10)
         
