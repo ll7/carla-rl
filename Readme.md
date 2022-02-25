@@ -40,4 +40,10 @@ check pythonpath with
 python -c "import carla; print(carla.__file__)"
 ```
 
+## change map
 
+https://github.com/carla-simulator/carla/issues/4901
+
+CarlaUE4/Config/DefaultEngine.ini
+
+not feasible to change default map easily
