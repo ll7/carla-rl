@@ -27,17 +27,24 @@ def main():
         actor_list.append(vehicle)
         print('created %s' % vehicle.type_id)
         
+        # set spectator as top down view
+        
         spectator = world.get_spectator()
         
-        # vehicle_transform = vehicle.get_transform()
+        spectator_transform = vehicle.get_transform()
         
-        spectator.set_transform(vehicle.get_transform())
+        spectator_transform.location.z += 20.0
+        spectator_transform.rotation.pitch = -90.0
+        
+        spectator.set_transform(spectator_transform)
         
         time.sleep(10)
         
     finally:
-        
-        
+        print('finally')    
+        client.apply_batch([carla.command.DestroyActor(x) for x in actor_list])
+        print('done.')
+
     
     
 if __name__=="__main__":
