@@ -2,7 +2,7 @@
 
 ## preperation
 
-- Download Carla
+- Download Carla0.9.10.13
 - use pip carla api
 
 
