@@ -47,3 +47,11 @@ https://github.com/carla-simulator/carla/issues/4901
 CarlaUE4/Config/DefaultEngine.ini
 
 not feasible to change default map easily
+
+## conda
+
+conda env create -f environment.yml
+
+currently `conda activate carla-rl-py37-c13`
+
+

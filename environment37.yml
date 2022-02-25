@@ -16,4 +16,5 @@ dependencies:
   - pip:
     - stable-baselines3[extra]
     - pygame # trouble to install via conda
-    - carla==0.9.12 # https://pypi.org/project/carla/#history
+    - /home/luttkule/git/carla0.9.13-bin/PythonAPI/carla/dist/carla-0.9.13-py3.7-linux-x86_64.egg
+    # - carla==0.9.12 # https://pypi.org/project/carla/#history
