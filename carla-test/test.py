@@ -22,27 +22,27 @@ def main():
         
         blueprint_library = world.get_blueprint_library()
         
-        bp = random.choice(blueprint_library.filter('vehicle'))
+        bp = blueprint_library.filter('0012')[0] # random.choice(blueprint_library.filter('walker'))
         
         transform = random.choice(world.get_map().get_spawn_points())
         
-        vehicle = world.spawn_actor(bp, transform)
+        walker = world.spawn_actor(bp, transform)
         
-        actor_list.append(vehicle)
-        print('created %s' % vehicle.type_id)
+        actor_list.append(walker)
+        print('created %s' % walker.type_id)
         
         # set spectator as top down view
         
         spectator = world.get_spectator()
         
-        spectator_transform = vehicle.get_transform()
+        spectator_transform = walker.get_transform()
         
         spectator_transform.location.z += 20.0
         spectator_transform.rotation.pitch = -90.0
         
         spectator.set_transform(spectator_transform)
         
-        # create a segmentation camera and attach to vehicle
+        # create a segmentation camera and attach to walker
         
         seg_camera_bp = blueprint_library.find('sensor.camera.semantic_segmentation')
         
@@ -52,7 +52,7 @@ def main():
         seg_camera_bp.set_attribute('image_size_y', '128')
         seg_camera_bp.set_attribute('fov', '170.0')
         
-        camera = world.spawn_actor(seg_camera_bp, camera_transform, attach_to=vehicle)
+        camera = world.spawn_actor(seg_camera_bp, camera_transform, attach_to=walker)
         
         
         
