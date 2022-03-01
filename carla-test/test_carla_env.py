@@ -8,10 +8,7 @@ import time
 def main():
     env = CarlaWalkerEnv()
     env.reset()
-    # env.render()
-    # env.step(env.action_space.sample())
-    time.sleep(5)
-    # env.step(env.action_space.sample())
+    logging.debug('we start to take ticks in main')
     for i in range(1):
         env.step(env.action_space.sample())
         logging.debug('step {} in main'.format(i))

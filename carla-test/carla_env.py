@@ -44,8 +44,11 @@ class CarlaWalkerEnv(Env):
         )
 
         # carla setup
+        
+        logging.debug('waiting for server')
         self.client = carla.Client('localhost', 2000)
-        self.client.set_timeout(20.0)
+        self.client.set_timeout(30.0)
+        logging.debug('server connected')
 
         self.world = self.client.get_world()
 
@@ -111,14 +114,14 @@ class CarlaWalkerEnv(Env):
 
     def reset(self):
         """spawn walker and attach camera"""
-
+        self.world.tick()
         self.actor_list = []
 
         self.walker_bp = self.blueprint_library.filter('0012')[0]
 
         spawn_points = self.world.get_map().get_spawn_points()
 
-        self.walker_spawn_transform = spawn_points[5]
+        self.walker_spawn_transform = random.choice(spawn_points)
         logging.debug('spawning walker at %s' %
                       self.walker_spawn_transform.location)
 
@@ -127,7 +130,8 @@ class CarlaWalkerEnv(Env):
 
         self.actor_list.append(self.walker)
         logging.debug('created %s' % self.walker.type_id)
-
+        
+        # self.world.tick()
         if self.verbose:
             distance_from_spawn_point = self.walker.get_location() - \
                 self.walker_spawn_transform.location
@@ -143,17 +147,17 @@ class CarlaWalkerEnv(Env):
 
         # set spectator if render is true
         if self.to_render == True:
-            logging.debug('render per default')
-            self.render()
+            logging.debug('render per default during init')
+            self.render(init=True)
 
         # make a tick for the changes to take effect
-        time.sleep(0.5)
-        for i in range(3):
-            self.world.tick()
-            logging.debug('tick {} in reset'.format(i))
-            time.sleep(1)
-        # self.world.tick()
-        # logging.debug('tick in reset')
+        # time.sleep(0.5)
+        # for i in range(3):
+        #     self.world.tick()
+        #     logging.debug('tick {} in reset'.format(i))
+        #     time.sleep(1)
+        self.world.tick()
+        logging.debug('tick in reset')
 
         return self.observation
 
@@ -162,22 +166,30 @@ class CarlaWalkerEnv(Env):
         logging.debug('taking step')
 
         self.world.tick()
-        time.sleep(0.2)
+        time.sleep(0.2) # TODO remove this
 
+        # TODO return
         # return self.reward, self.observation, self.done, self.info
 
-        # self.world.step()
-        # pass
 
-    def render(self):
+    def render(self, init = False):
         """show an rgb image of the current observation"""
+        # TODO resetting the spectator only works, if there is a tick after the settings are applied
+        
         logging.debug('rendering')
         # set spectator as top down view
 
         self.spectator = self.world.get_spectator()
 
-        self.spectator_transform = self.walker.get_transform()
-
+        if init:
+            # during the reset proces and the initial step, the walker is not spawned yet
+            # therefore we would get an incorrect walker location and we choose the walker spawn location instead
+            self.spectator_transform = self.walker_spawn_transform
+        else:
+            # if we are during the normal run process and want to set the spectator such that we have a correct view
+            # we use the walker location
+            self.spectator_transform = self.walker.get_transform() # only if you already ticked
+        
         self.spectator_transform.location.z += 10.0
         self.spectator_transform.rotation.pitch = -90.0
 
@@ -186,8 +198,11 @@ class CarlaWalkerEnv(Env):
     def close(self):
         """if done, tidy up and destroy actors"""
         logging.debug('closing environment')
-        # self.camera.destroy()
-        logging.debug('active actors: {}'.format(self.world.get_actors()))
+        
+        # self.camera.destroy() 
+        # TODO why does the camera needs to be destroyed? TODO
+        
+        # logging.debug('active actors: {}'.format(self.world.get_actors()))
         logging.debug('listed actors: {}'.format(self.actor_list))
         self.client.apply_batch([carla.command.DestroyActor(x)
                                 for x in self.actor_list])
@@ -197,7 +212,7 @@ class CarlaWalkerEnv(Env):
 
         logging.debug('destroyed actors')
 
-        self.settings.synchronous_mode = False  # Disable synchronous mode
-        self.world.apply_settings(self.settings)
+        # self.settings.synchronous_mode = False  # Disable synchronous mode
+        # self.world.apply_settings(self.settings)
 
         logging.debug('======== closed environment ========')
