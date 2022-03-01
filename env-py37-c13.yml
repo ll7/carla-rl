@@ -12,6 +12,7 @@ dependencies:
   - pandas
   - matplotlib
   - gym-all
+  - autopep8
   - pip
   - pip:
     - stable-baselines3[extra]
