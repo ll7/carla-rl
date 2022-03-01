@@ -28,6 +28,8 @@ class CarlaWalkerEnv(Env):
         self.image_size_x = 128
         self.image_size_y = 128
         self.pov = 170.0
+        
+        self.max_walking_speed = 15.0 / 3.6  # m/s
 
         self.observation = np.ndarray(
             shape=(self.image_size_x, self.image_size_y, ), dtype=np.uint8)
@@ -100,9 +102,9 @@ class CarlaWalkerEnv(Env):
             carla.Rotation(pitch=-90.0)
         )
 
-        self.seg_camera_bp.set_attribute('image_size_x', '128')
-        self.seg_camera_bp.set_attribute('image_size_y', '128')
-        self.seg_camera_bp.set_attribute('fov', '170.0')
+        self.seg_camera_bp.set_attribute('image_size_x', str(self.image_size_x))
+        self.seg_camera_bp.set_attribute('image_size_y', str(self.image_size_y))
+        self.seg_camera_bp.set_attribute('fov', str(self.pov))
 
         self.camera = self.world.spawn_actor(
             self.seg_camera_bp,
@@ -131,7 +133,7 @@ class CarlaWalkerEnv(Env):
 
         bgra1 bgra2 ...
 
-        we need only the red values according to 
+        we need only the red values according to
         https://carla.readthedocs.io/en/latest/ref_sensors/#semantic-segmentation-camera
 
         to get our observation we access the array with [start:end:step]
@@ -236,11 +238,41 @@ class CarlaWalkerEnv(Env):
         return self.observation
 
     def step(self, action):
-        """apply action to walker and return reward, observation, done, info"""
+        """apply action to walker and return reward, observation, done, info
+
+        action: array([-0.612514  ,  0.95657253], dtype=float32)
+            shape: (2,)
+
+        #carlawalkercontrol
+        applies carla.WalkerControl https://carla.readthedocs.io/en/latest/python_api/
+        """
         logging.debug('taking step')
 
+        # length of the action vector could effect the maximum speed of the walker which is not desired and this special case is catched here
+        action_length = np.linalg.norm(action)
+        if action_length == 0.0:
+            # the chances are slim, but theoretically both actions could be 0.0
+            unit_action = np.array([0.0, 0.0], dtype=np.float32)
+        elif action_length > 1.0:
+            # create a vector for the action with the length of zero
+            unit_action = action / action_length
+        else:
+            unit_action = action
+
+        direction = carla.Vector3D(x=float(unit_action[0]), y=float(unit_action[1]), z=0.0)
+
+        walker_control=carla.WalkerControl(direction, speed = self.max_walking_speed)
+        
+        self.walker.apply_control(walker_control)
+        
+        
+
         self.world.tick()
-        time.sleep(0.2)  # TODO remove this
+        
+        # slow down simulation in verbose mode
+        # TODO desired?
+        if self.verbose:
+            time.sleep(0.2)  # TODO make time step size a parameter
 
         # TODO return
         # return self.reward, self.observation, self.done, self.info
@@ -252,21 +284,21 @@ class CarlaWalkerEnv(Env):
         logging.debug('rendering')
         # set spectator as top down view
 
-        self.spectator = self.world.get_spectator()
+        self.spectator=self.world.get_spectator()
 
         if init:
             # during the reset proces and the initial step, the walker is not spawned yet
             # therefore we would get an incorrect walker location and we choose the walker
             # spawn location instead
-            self.spectator_transform = self.walker_spawn_transform
+            self.spectator_transform=self.walker_spawn_transform
         else:
             # if we are during the normal run process and want to set the spectator
             # such that we have a correct view
             # we use the walker location
-            self.spectator_transform = self.walker.get_transform()  # only if you already ticked
+            self.spectator_transform=self.walker.get_transform()  # only if you already ticked
 
         self.spectator_transform.location.z += 10.0
-        self.spectator_transform.rotation.pitch = -90.0
+        self.spectator_transform.rotation.pitch=-90.0
 
         self.spectator.set_transform(self.spectator_transform)
 

@@ -29,8 +29,8 @@ def main():
         level=logging.DEBUG,
         format="%(asctime)s [%(levelname)s] %(message)s",
         handlers=[
-            logging.FileHandler(
-                "./tmp/logs/logging/" + datetime.now().strftime('%Y-%m-%d_%H%M') + ".log"),
+            # logging.FileHandler(
+            #     "./tmp/logs/logging/" + datetime.now().strftime('%Y-%m-%d_%H%M') + ".log"),
             logging.StreamHandler()
         ]
     )
@@ -38,7 +38,7 @@ def main():
     env = CarlaWalkerEnv()
     print(env.reset())
     logging.debug('we start to take ticks in main')
-    for i in range(1):
+    for i in range(10):
         env.step(env.action_space.sample())
         logging.debug('step {} in main'.format(i))
         # env.render()
