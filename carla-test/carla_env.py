@@ -3,6 +3,7 @@ from gym.spaces import Box
 import numpy as np
 import carla
 import time
+from datetime import datetime
 import random
 
 import logging
@@ -28,6 +29,11 @@ class CarlaWalkerEnv(Env):
         self.image_size_y = 128
         self.pov = 170.0
 
+        self.observation = np.ndarray(
+            shape=(self.image_size_x, self.image_size_y, ), dtype=np.uint8)
+
+        self.now = datetime.now().strftime('%Y-%m-%d_%H%M')
+
         self.actor_list = []
 
         # TODO this needs to be normalized later
@@ -44,7 +50,7 @@ class CarlaWalkerEnv(Env):
         )
 
         # carla setup
-        
+
         logging.debug('waiting for server')
         self.client = carla.Client('localhost', 2000)
         self.client.set_timeout(30.0)
@@ -109,8 +115,62 @@ class CarlaWalkerEnv(Env):
 
     def __get_camera_image(self):
         """get the camera image and pass the camera image to the observation space"""
+        # TODO delete because obsolete
+        self.camera.listen(lambda image: image.save_to_disk(
+            './tmp/{}/{}.png'.format(self.now, image.frame_number),
+            carla.ColorConverter.CityScapesPalette)
+        )
+        # return observation
 
         pass
+
+    def __create_observation(self, data):
+        """create observation based on the camera image received
+
+        the data we receive is a carla.Image object formatted as a bgra byte array
+
+        bgra1 bgra2 ...
+
+        we need only the red values according to 
+        https://carla.readthedocs.io/en/latest/ref_sensors/#semantic-segmentation-camera
+
+        to get our observation we access the array with [start:end:step]
+        and we finally reshape the array from 1D to 2D + R channel
+        """
+        logging.debug('=== creating observation ===')
+        # logging.debug('data: {}'.format(data))
+        # logging.debug('data type: {}'.format(type(data)))
+        # logging.debug('data len: {}'.format(len(data)))
+        # with open("data_raw_dat" + self.now + ".txt", "w") as text_file:
+        #     text_file.write(str(data.raw_data))
+        # data.convert(carla.ColorConverter.Raw)
+
+        if self.verbose:
+            data.save_to_disk('./tmp/{}/{}.png'.format(self.now,
+                              data.frame_number), carla.ColorConverter.CityScapesPalette)
+            logging.debug('image saved to disk')
+        only_red = np.array(data.raw_data, dtype=np.uint8)[
+            2::4]  # only red values from bgRa
+        # reshape. validation: https://github.com/ll7/carla-rl/issues/7#issuecomment-1055582311
+        self.observation = only_red.reshape(
+            self.image_size_x, self.image_size_y)
+
+        # self.observation = np.array(data.raw_data, dtype=np.uint8)[2::4] # only red values from bgRa
+        # np.array(data.raw_data)
+        # logging.debug('observation: {}'.format(self.observation))
+        # logging.debug('observation type: {}'.format(type(self.observation)))
+        # logging.debug('observation len: {}'.format(len(self.observation)))
+        # with open("observation" + self.now + ".txt", "w") as text_file:
+        #     text_file.write(str(self.observation))
+
+        np.savetxt("observation" + self.now + ".txt",
+                   self.observation, fmt='%d')
+        # data.convert(carla.ColorConverter.Raw)
+        # print(data)
+        # print(len(data))
+        # print(type(data))
+
+        logging.debug('=== observation created ===')
 
     def reset(self):
         """spawn walker and attach camera"""
@@ -130,7 +190,7 @@ class CarlaWalkerEnv(Env):
 
         self.actor_list.append(self.walker)
         logging.debug('created %s' % self.walker.type_id)
-        
+
         # self.world.tick()
         if self.verbose:
             distance_from_spawn_point = self.walker.get_location() - \
@@ -139,11 +199,20 @@ class CarlaWalkerEnv(Env):
                           distance_from_spawn_point.length())
 
         # create camera
+        self.__create_camera()
 
-        # self.__create_camera()
+        # create segmentation camera listener which is called each tick and updates observation
+        self.camera.listen(
+            lambda data: self.__create_observation(data)
+            # lambda image: image.save_to_disk(
+            #     './tmp/{}/{}.png'.format(self.now, image.frame_number),
+            #     carla.ColorConverter.CityScapesPalette
+            #     )
+        )
+        # TODO check if the correct image is received and stored in observation or if the image is delayed
 
         # TODO destroy camera
-        self.observation = self.__get_camera_image()
+        # self.observation = self.__get_camera_image()
 
         # set spectator if render is true
         if self.to_render == True:
@@ -156,7 +225,12 @@ class CarlaWalkerEnv(Env):
         #     self.world.tick()
         #     logging.debug('tick {} in reset'.format(i))
         #     time.sleep(1)
-        self.world.tick()
+
+        self.reward = 0
+        self.done = False
+        self.info = {}
+
+        self.world.tick()  # this has to be the last line in reset
         logging.debug('tick in reset')
 
         return self.observation
@@ -166,16 +240,15 @@ class CarlaWalkerEnv(Env):
         logging.debug('taking step')
 
         self.world.tick()
-        time.sleep(0.2) # TODO remove this
+        time.sleep(0.2)  # TODO remove this
 
         # TODO return
         # return self.reward, self.observation, self.done, self.info
 
-
-    def render(self, init = False):
+    def render(self, init=False):
         """show an rgb image of the current observation"""
         # TODO resetting the spectator only works, if there is a tick after the settings are applied
-        
+
         logging.debug('rendering')
         # set spectator as top down view
 
@@ -183,13 +256,15 @@ class CarlaWalkerEnv(Env):
 
         if init:
             # during the reset proces and the initial step, the walker is not spawned yet
-            # therefore we would get an incorrect walker location and we choose the walker spawn location instead
+            # therefore we would get an incorrect walker location and we choose the walker
+            # spawn location instead
             self.spectator_transform = self.walker_spawn_transform
         else:
-            # if we are during the normal run process and want to set the spectator such that we have a correct view
+            # if we are during the normal run process and want to set the spectator
+            # such that we have a correct view
             # we use the walker location
-            self.spectator_transform = self.walker.get_transform() # only if you already ticked
-        
+            self.spectator_transform = self.walker.get_transform()  # only if you already ticked
+
         self.spectator_transform.location.z += 10.0
         self.spectator_transform.rotation.pitch = -90.0
 
@@ -198,10 +273,10 @@ class CarlaWalkerEnv(Env):
     def close(self):
         """if done, tidy up and destroy actors"""
         logging.debug('closing environment')
-        
-        # self.camera.destroy() 
+
+        # self.camera.destroy()
         # TODO why does the camera needs to be destroyed? TODO
-        
+
         # logging.debug('active actors: {}'.format(self.world.get_actors()))
         logging.debug('listed actors: {}'.format(self.actor_list))
         self.client.apply_batch([carla.command.DestroyActor(x)
