@@ -29,6 +29,9 @@ class CarlaWalkerEnv(Env):
         self.image_size_y = 128
         self.pov = 170.0
         
+        self.max_tick_count = 30
+        self.fixed_time_step = 0.05
+        
         self.max_walking_speed = 15.0 / 3.6  # m/s
 
         self.observation = np.ndarray(
@@ -77,7 +80,7 @@ class CarlaWalkerEnv(Env):
         # set fixed time-step
         # https://carla.readthedocs.io/en/latest/adv_synchrony_timestep/#fixed-time-step
         self.settings = self.world.get_settings()
-        self.settings.fixed_delta_seconds = 0.05
+        self.settings.fixed_delta_seconds = self.fixed_time_step
         self.world.apply_settings(self.settings)
 
         # set synchronous mode
@@ -165,19 +168,28 @@ class CarlaWalkerEnv(Env):
         # with open("observation" + self.now + ".txt", "w") as text_file:
         #     text_file.write(str(self.observation))
 
-        np.savetxt("observation" + self.now + ".txt",
-                   self.observation, fmt='%d')
+        # np.savetxt("observation" + self.now + ".txt",
+        #            self.observation, fmt='%d')
+        
         # data.convert(carla.ColorConverter.Raw)
         # print(data)
         # print(len(data))
         # print(type(data))
 
         logging.debug('=== observation created ===')
+        
+    def __reward_calculation(self):
+        """calculate the reward and apply reward
+        """        
+        # distance_vector = self.walker_spawn_transform - self.walker.get_location()
+        self.reward = self.walker_spawn_transform.location.distance(self.walker.get_location())
 
     def reset(self):
         """spawn walker and attach camera"""
         self.world.tick()
         self.actor_list = []
+        
+        self.tick_count = 0
 
         self.walker_bp = self.blueprint_library.filter('0012')[0]
 
@@ -247,6 +259,8 @@ class CarlaWalkerEnv(Env):
         applies carla.WalkerControl https://carla.readthedocs.io/en/latest/python_api/
         """
         logging.debug('taking step')
+        
+        # self.walker_last_location = self.walker.get_location()
 
         # length of the action vector could effect the maximum speed of the walker which is not desired and this special case is catched here
         action_length = np.linalg.norm(action)
@@ -264,18 +278,28 @@ class CarlaWalkerEnv(Env):
         walker_control=carla.WalkerControl(direction, speed = self.max_walking_speed)
         
         self.walker.apply_control(walker_control)
-        
-        
 
+        #### TICK ####
         self.world.tick()
+        self.tick_count += 1
+        ##############
+        
+        self.__reward_calculation()
+        
+        if self.tick_count >= self.max_tick_count:
+            self.done = True
+            logging.info('done')
+            
+        
+        
         
         # slow down simulation in verbose mode
         # TODO desired?
         if self.verbose:
-            time.sleep(0.2)  # TODO make time step size a parameter
+            time.sleep(self.fixed_time_step)
 
         # TODO return
-        # return self.reward, self.observation, self.done, self.info
+        return self.reward, self.observation, self.done, self.info
 
     def render(self, init=False):
         """show an rgb image of the current observation"""
