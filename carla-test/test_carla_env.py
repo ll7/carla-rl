@@ -41,7 +41,7 @@ def main():
     # set up environment
     env = CarlaWalkerEnv(verbose=False)
     
-    manual_iteration(env, number_of_iterations=1)
+    manual_iteration(env, number_of_iterations=3)
     
     logging.debug('stabel_baselines3 env_checker')
     env_checker.check_env(env)

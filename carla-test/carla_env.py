@@ -13,7 +13,7 @@ logger.setLevel(logging.DEBUG)
 
 class CarlaWalkerEnv(Env):
     """simple walk gym environment for carla where you try to walk as far as possible
-    
+
     https://stable-baselines3.readthedocs.io/en/master/guide/custom_env.html
     """
 
@@ -31,10 +31,10 @@ class CarlaWalkerEnv(Env):
         self.image_size_x = 128
         self.image_size_y = 128
         self.pov = 170.0
-        
+
         self.max_tick_count = 30
         self.fixed_time_step = 0.05
-        
+
         self.max_walking_speed = 15.0 / 3.6  # m/s
 
         self.observation = np.ndarray(
@@ -95,7 +95,31 @@ class CarlaWalkerEnv(Env):
 
         self.blueprint_library = self.world.get_blueprint_library()
 
-        pass
+        # === walker ===
+        self.__spawn_walker()
+
+        if self.verbose:
+            # print distance to spawn point
+            # TODO obsolete?
+            distance_from_spawn_point = self.walker.get_location() - \
+                self.walker_spawn_transform.location
+            logging.debug('distance from spawn point: %s' %
+                          distance_from_spawn_point.length())
+
+        # === camera ===
+        self.__create_camera()
+
+        # create segmentation camera listener which is called each tick and updates observation
+        self.camera.listen(
+            lambda data: self.__create_observation(data)
+            # lambda image: image.save_to_disk(
+            #     './tmp/{}/{}.png'.format(self.now, image.frame_number),
+            #     carla.ColorConverter.CityScapesPalette
+            #     )
+        )
+
+        # tick once for the changes to take effect
+        self.world.tick()
 
     def __create_camera(self):
         """create a camera and attach it to the walker"""
@@ -108,8 +132,10 @@ class CarlaWalkerEnv(Env):
             carla.Rotation(pitch=-90.0)
         )
 
-        self.seg_camera_bp.set_attribute('image_size_x', str(self.image_size_x))
-        self.seg_camera_bp.set_attribute('image_size_y', str(self.image_size_y))
+        self.seg_camera_bp.set_attribute(
+            'image_size_x', str(self.image_size_x))
+        self.seg_camera_bp.set_attribute(
+            'image_size_y', str(self.image_size_y))
         self.seg_camera_bp.set_attribute('fov', str(self.pov))
 
         self.camera = self.world.spawn_actor(
@@ -173,27 +199,22 @@ class CarlaWalkerEnv(Env):
 
         # np.savetxt("observation" + self.now + ".txt",
         #            self.observation, fmt='%d')
-        
+
         # data.convert(carla.ColorConverter.Raw)
         # print(data)
         # print(len(data))
         # print(type(data))
 
         logging.debug('=== observation created ===')
-        
+
     def __reward_calculation(self):
         """calculate the reward and apply reward
-        """        
+        """
         # distance_vector = self.walker_spawn_transform - self.walker.get_location()
-        self.reward = self.walker_spawn_transform.location.distance(self.walker.get_location())
+        self.reward = self.walker_spawn_transform.location.distance(
+            self.walker.get_location())
 
-    def reset(self):
-        """spawn walker and attach camera"""
-        self.world.tick()
-        self.actor_list = []
-        
-        self.tick_count = 0
-
+    def __spawn_walker(self):
         self.walker_bp = self.blueprint_library.filter('0012')[0]
 
         spawn_points = self.world.get_map().get_spawn_points()
@@ -207,42 +228,33 @@ class CarlaWalkerEnv(Env):
 
         self.actor_list.append(self.walker)
         logging.debug('created %s' % self.walker.type_id)
+        
+    def __set_walker_location(self):
+        spawn_points = self.world.get_map().get_spawn_points()
 
-        # self.world.tick()
-        if self.verbose:
-            distance_from_spawn_point = self.walker.get_location() - \
-                self.walker_spawn_transform.location
-            logging.debug('distance from spawn point: %s' %
-                          distance_from_spawn_point.length())
+        self.walker_spawn_transform = random.choice(spawn_points)
+        
+        self.walker.set_transform(self.walker_spawn_transform)
 
-        # create camera
-        self.__create_camera()
+    def reset(self):
+        """spawn walker and attach camera"""
+        # self.world.tick() # why would I tick here?
 
-        # create segmentation camera listener which is called each tick and updates observation
-        self.camera.listen(
-            lambda data: self.__create_observation(data)
-            # lambda image: image.save_to_disk(
-            #     './tmp/{}/{}.png'.format(self.now, image.frame_number),
-            #     carla.ColorConverter.CityScapesPalette
-            #     )
-        )
+        # self.actor_list = []
+
         # TODO check if the correct image is received and stored in observation or if the image is delayed
 
         # TODO destroy camera
         # self.observation = self.__get_camera_image()
 
+        self.__set_walker_location()
+        
         # set spectator if render is true
         if self.to_render == True:
             logging.debug('render per default during init')
             self.render(init=True)
 
-        # make a tick for the changes to take effect
-        # time.sleep(0.5)
-        # for i in range(3):
-        #     self.world.tick()
-        #     logging.debug('tick {} in reset'.format(i))
-        #     time.sleep(1)
-
+        self.tick_count = 0
         self.reward = 0
         self.done = False
         self.info = {}
@@ -262,7 +274,7 @@ class CarlaWalkerEnv(Env):
         applies carla.WalkerControl https://carla.readthedocs.io/en/latest/python_api/
         """
         logging.debug('taking step')
-        
+
         # self.walker_last_location = self.walker.get_location()
 
         # length of the action vector could effect the maximum speed of the walker which is not desired and this special case is catched here
@@ -276,26 +288,25 @@ class CarlaWalkerEnv(Env):
         else:
             unit_action = action
 
-        direction = carla.Vector3D(x=float(unit_action[0]), y=float(unit_action[1]), z=0.0)
+        direction = carla.Vector3D(
+            x=float(unit_action[0]), y=float(unit_action[1]), z=0.0)
 
-        walker_control=carla.WalkerControl(direction, speed = self.max_walking_speed)
-        
+        walker_control = carla.WalkerControl(
+            direction, speed=self.max_walking_speed)
+
         self.walker.apply_control(walker_control)
 
         #### TICK ####
         self.world.tick()
         self.tick_count += 1
         ##############
-        
+
         self.__reward_calculation()
-        
+
         if self.tick_count >= self.max_tick_count:
             self.done = True
             logging.info('done')
-            
-        
-        
-        
+
         # slow down simulation in verbose mode
         # TODO desired?
         if self.verbose:
@@ -311,21 +322,21 @@ class CarlaWalkerEnv(Env):
         logging.debug('rendering')
         # set spectator as top down view
 
-        self.spectator=self.world.get_spectator()
+        self.spectator = self.world.get_spectator()
 
         if init:
             # during the reset proces and the initial step, the walker is not spawned yet
             # therefore we would get an incorrect walker location and we choose the walker
             # spawn location instead
-            self.spectator_transform=self.walker_spawn_transform
+            self.spectator_transform = self.walker_spawn_transform
         else:
             # if we are during the normal run process and want to set the spectator
             # such that we have a correct view
             # we use the walker location
-            self.spectator_transform=self.walker.get_transform()  # only if you already ticked
+            self.spectator_transform = self.walker.get_transform()  # only if you already ticked
 
         self.spectator_transform.location.z += 10.0
-        self.spectator_transform.rotation.pitch=-90.0
+        self.spectator_transform.rotation.pitch = -90.0
 
         self.spectator.set_transform(self.spectator_transform)
 
