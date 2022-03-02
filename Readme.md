@@ -54,4 +54,10 @@ conda env create -f environment.yml
 
 currently `conda activate carla-rl-py37-c13`
 
+## IP address
 
+provide the IP adress of the carla server in the ip-host.txt file if you want to run the server somewhere else and use the carla_env.read_IP_from_file() function
+
+used https://stackoverflow.com/questions/4348590/how-can-i-make-git-ignore-future-revisions-to-a-file to ignore future changes to the file
+
+`git update-index --skip-worktree ip-host.txt`
