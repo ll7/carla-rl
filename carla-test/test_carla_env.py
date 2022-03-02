@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from carla_env import CarlaWalkerEnv
+from carla_env import CarlaWalkerEnv, read_IP_from_file
 import logging
 import time
 from datetime import datetime # required for logging to file
@@ -39,7 +39,7 @@ def main():
     logging.info('=== start main ===')
 
     # set up environment
-    env = CarlaWalkerEnv(verbose=False)
+    env = CarlaWalkerEnv(verbose=False, host=read_IP_from_file())
     
     manual_iteration(env, number_of_iterations=3)
     

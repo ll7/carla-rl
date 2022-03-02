@@ -11,6 +11,14 @@ logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
 
 
+def read_IP_from_file(file_name = "ip-host.txt"):
+    """read IP from file"""
+    with open(file_name) as f:
+        lines = f.readlines()
+    IP = lines[0]
+    print('IP: {}'.format(IP))
+    return IP
+
 class CarlaWalkerEnv(Env):
     """simple walk gym environment for carla where you try to walk as far as possible
 
@@ -20,13 +28,16 @@ class CarlaWalkerEnv(Env):
     def __init__(
         self,
         render=True,
-        verbose=True
+        verbose=True,
+        host='localhost',
     ):
         """establish connection to carla server and choose map"""
 
         # set constant parameters
         self.to_render = render
         self.verbose = verbose
+        self.host = host
+        
         self.town = 'Town01'
         self.image_size_x = 128
         self.image_size_y = 128
@@ -60,7 +71,7 @@ class CarlaWalkerEnv(Env):
         # carla setup
 
         logging.debug('waiting for server')
-        self.client = carla.Client('localhost', 2000)
+        self.client = carla.Client(self.host, 2000)
         self.client.set_timeout(60.0)
         logging.debug('server connected')
 
@@ -120,6 +131,8 @@ class CarlaWalkerEnv(Env):
 
         # tick once for the changes to take effect
         self.world.tick()
+        
+    
 
     def __create_camera(self):
         """create a camera and attach it to the walker"""
