@@ -3,28 +3,29 @@
 from carla_env import CarlaWalkerEnv
 import logging
 import time
-from datetime import datetime
+from datetime import datetime # required for logging to file
 
+from stable_baselines3.common import env_checker
+
+def manual_iteration(env, number_of_iterations=1):
+    """iterate manually over the environment"""
+    logging.debug('manual_iteration for {} iterations'.format(number_of_iterations))
+    print(env.reset())
+    logging.debug('we start to take ticks in main')
+    for i in range(number_of_iterations):
+        logging.debug('step {} in main'.format(i))
+        observation, reward, done, info = env.step(env.action_space.sample())
+        logging.debug('type of observation: {}'.format(type(observation)))
+        
+        # env.render()
+        time.sleep(1)
+    env.close()
+    logging.debug('manual_iteration done')
 
 def main():
+    """main function"""
 
-    # setup logging
-
-    # logPath = './logs/logging/' + __name__
-    # now = datetime.now().strftime('%Y-%m-%d_%H%M')
-    # fileName = now + '_' + __name__ + '.log'
-
-    # logFormatter = logging.Formatter("%(asctime)s [%(threadName)-12.12s] [%(levelname)-5.5s]  %(message)s")
-    # rootLogger = logging.getLogger()
-
-    # fileHandler = logging.FileHandler("{0}/{1}.log".format(logPath, fileName))
-    # fileHandler.setFormatter(logFormatter)
-    # rootLogger.addHandler(fileHandler)
-
-    # consoleHandler = logging.StreamHandler()
-    # consoleHandler.setFormatter(logFormatter)
-    # rootLogger.addHandler(consoleHandler)
-
+    # set up logging
     logging.basicConfig(
         level=logging.DEBUG,
         format="%(asctime)s [%(levelname)s] %(message)s",
@@ -34,18 +35,18 @@ def main():
             logging.StreamHandler()
         ]
     )
+    
+    logging.info('=== start main ===')
 
-    env = CarlaWalkerEnv()
-    print(env.reset())
-    logging.debug('we start to take ticks in main')
-    for i in range(10):
-        env.step(env.action_space.sample())
-        logging.debug('step {} in main'.format(i))
-        # env.render()
-        time.sleep(1)
-    env.close()
+    # set up environment
+    env = CarlaWalkerEnv(verbose=False)
+    
+    manual_iteration(env, number_of_iterations=1)
+    
+    logging.debug('stabel_baselines3 env_checker')
+    env_checker.check_env(env)
 
-    pass
+    
 
 
 if __name__ == "__main__":

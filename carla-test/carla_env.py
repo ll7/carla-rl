@@ -12,7 +12,10 @@ logger.setLevel(logging.DEBUG)
 
 
 class CarlaWalkerEnv(Env):
-    """simple walk gym environment for carla where you try to walk as far as possible"""
+    """simple walk gym environment for carla where you try to walk as far as possible
+    
+    https://stable-baselines3.readthedocs.io/en/master/guide/custom_env.html
+    """
 
     def __init__(
         self,
@@ -41,7 +44,7 @@ class CarlaWalkerEnv(Env):
 
         self.actor_list = []
 
-        # TODO this needs to be normalized later
+        # this needs to be normalized later to a total length of 1
         self.action_space = Box(low=-1, high=1, shape=(2,), dtype=np.float32)
 
         # receive a segmentation image from the carla server
@@ -58,7 +61,7 @@ class CarlaWalkerEnv(Env):
 
         logging.debug('waiting for server')
         self.client = carla.Client('localhost', 2000)
-        self.client.set_timeout(30.0)
+        self.client.set_timeout(60.0)
         logging.debug('server connected')
 
         self.world = self.client.get_world()
@@ -299,7 +302,7 @@ class CarlaWalkerEnv(Env):
             time.sleep(self.fixed_time_step)
 
         # TODO return
-        return self.reward, self.observation, self.done, self.info
+        return self.observation, self.reward, self.done, self.info
 
     def render(self, init=False):
         """show an rgb image of the current observation"""
