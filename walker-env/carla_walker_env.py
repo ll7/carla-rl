@@ -1,5 +1,5 @@
 from gym import Env
-from gym.spaces import Box
+from gym.spaces import Box, Dict
 import numpy as np
 import carla
 import time
@@ -32,7 +32,17 @@ class CarlaWalkerEnv(Env):
         verbose=True,
         host='localhost',
     ):
-        """establish connection to carla server and choose map"""
+        """
+        init:
+        - define default values
+        - define interface 
+        - establish connection to carla server
+        - choose map
+        - spawn walker
+        - attach camera
+        """
+        
+        super(CarlaWalkerEnv, self).__init__()
 
         # set constant parameters
         self.to_render = render
@@ -51,25 +61,34 @@ class CarlaWalkerEnv(Env):
 
         self.max_walking_speed = 15.0 / 3.6  # m/s
 
-        self.observation = np.ndarray(
-            shape=(self.image_size_x, self.image_size_y, ), dtype=np.uint8)
-
         self.now = datetime.now().strftime('%Y-%m-%d_%H%M')
 
         self.actor_list = []
+        
+        # # Space Definiton
 
         # this needs to be normalized later to a total length of 1
         self.action_space = Box(low=-1, high=1, shape=(2,), dtype=np.float32)
 
         # receive a segmentation image from the carla server
         # https://carla.readthedocs.io/en/latest/ref_sensors/#semantic-segmentation-camera
-        # TODO ensure only the Red value is returned as observation
-        self.observation_space = Box(
-            low=0,
-            high=22,  # 22 is the number of classes in the segmentation image
-            shape=(self.image_size_x, self.image_size_y, ),
-            dtype=np.uint8
-        )
+        self.observation_space = Dict({
+            "segmentation_camera": 
+                Box(
+                    low=0,
+                    high=22,  # 22 is the number of classes in the segmentation image
+                    shape=(self.image_size_x, self.image_size_y, ),
+                    dtype=np.uint8
+                ),
+            "start_location": Box(low=-1, high=1, shape=(2,), dtype=np.float32), # TODO fix low and high
+            "current_location": Box(low=-1, high=1, shape=(2,), dtype=np.float32), # TODO fix low and high
+        })
+        # TODO fix observation space everywhere else.
+        
+        # TODO Test: initialize observation by sampling from the observation space
+        self.observation = self.observation_space.sample()
+        # np.ndarray(
+        #     shape=(self.image_size_x, self.image_size_y, ), dtype=np.uint8)
 
         # carla setup
 
