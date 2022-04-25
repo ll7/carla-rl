@@ -1,10 +1,13 @@
 # Carla Reinforcement Learning
 
-## preperation
+This repository tracks the tests to use reinforcement learning in carla.
 
-- Download Carla0.9.10.13
+## Preperation
+
+- Download Carla0.9.13
 - use pip carla api
 
+## Create the reinforcement learning python environment
 
 `conda env create -f environment.yml`
 
