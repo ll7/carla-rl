@@ -92,7 +92,7 @@ class CarlaWalkerEnv(Env):
 
         self.max_dist_start = 100.0
         """maximum distance to walk in one episode for observation space
-        TODO check max_dist_start in episode end"""
+        check max_dist_start in episode end"""
 
         self.observation_space = Dict({
             "segmentation_camera":
@@ -108,8 +108,12 @@ class CarlaWalkerEnv(Env):
                 shape=(2,),
                 dtype=np.float32
                 ),
-            # TODO fix low and high and shape
-            "current_orientation": Box(low=-1, high=1, shape=(2,), dtype=np.float32),
+            # TODO 360 degrees are likely not correct
+            "current_orientation": Box(
+                low=-360.0, 
+                high=360.0, 
+                shape=(1,), 
+                dtype=np.float32),
         })
         """
         observation_space: gym.spaces.Dict
@@ -117,8 +121,6 @@ class CarlaWalkerEnv(Env):
         receive a segmentation image from the carla server
         https://carla.readthedocs.io/en/latest/ref_sensors/#semantic-segmentation-camera
         """
-
-        # TODO fix observation space everywhere else.
 
         # initialize observation by sampling from the observation space
         self.observation = self.observation_space.sample()
@@ -188,7 +190,7 @@ class CarlaWalkerEnv(Env):
         self.settings = self.world.get_settings()
         self.settings.synchronous_mode = True  # Enables synchronous mode
         self.world.apply_settings(self.settings)
-        # TODO remember to make each step tick
+        # remember to make each step tick
 
         self.blueprint_library = self.world.get_blueprint_library()
 
@@ -217,17 +219,6 @@ class CarlaWalkerEnv(Env):
 
         self.actor_list.append(self.camera)
         logging.debug('created %s' % self.camera.type_id)
-
-    def __get_camera_image(self):
-        """get the camera image and pass the camera image to the observation space"""
-        # TODO delete because obsolete
-        self.camera.listen(lambda image: image.save_to_disk(
-            './tmp/{}/{}.png'.format(self.now, image.frame_number),
-            carla.ColorConverter.CityScapesPalette)
-        )
-        # return observation
-
-        pass
 
     def __create_observation(self, data: carla.Image):
         """create observation based on the camera image received
@@ -262,29 +253,54 @@ class CarlaWalkerEnv(Env):
         )
         
         # TODO TEST if yaw is correct angle for orientation
+        # yaw: https://carla.readthedocs.io/en/latest/python_api/#carlarotation
         self.observation["current_orientation"] = self.walker.get_transform().rotation.yaw
         
         # TODO TEST if transform is recieved correctly
-        # TODO location is 3D, observation is 2D.
-        vec_from_spawn2walker = self.walker.get_transform().location - self.walker_spawn_transform.location
         
-        self.observation["distance_from_start"] = self.walker.get_location() - \
+        self.vec3D_from_spawn2walker: carla.Location = self.walker.get_location() - \
             self.walker_spawn_transform.location
+        """Vector from spawn point to current walker location
+        https://github.com/ll7/carla-rl/issues/19#issuecomment-1109785779
+        """ 
+        
+        # get the 1D distance from walker to spawn point
+        self.dist_from_spawn2walker = self.vec3D_from_spawn2walker.distance(carla.Location())
+        
+        self.observation["distance_from_start"] = np.array(
+            [self.vec3D_from_spawn2walker.x, 
+             self.vec3D_from_spawn2walker.y],
+            dtype=np.float32)
+        """
+        distance from spawn point to current walker location in 2D x, y
+        """
         
 
         logging.debug('=== observation created ===')
 
     def __reward_calculation(self):
         """calculate the reward and apply reward
+        
+        the action of the last step should be rewarded:
+        get the distance travelled away from the spawn point due to the last action
+        if direction of self.vec3D_from_spawn2walker and walker orientation align, then reward is positive.
+        
+        https://carla.readthedocs.io/en/latest/python_api/#instance-variables_77
+        direction is global
+        
+        if the walker walks in the same direction as spawn2walker, then reward is big
+        
         """
-        self.reward = self.walker_spawn_transform.location.distance(
-            self.walker.get_location())
+                
+        reward_vector = self.walker_direction + self.vec3D_from_spawn2walker.make_unit_vector()
+        self.reward = reward_vector.length()
 
     def __spawn_walker(self):
         """Spawn the walker in a random vehicle spawn point
 
         TODO make it possible to spawn the walker in a specific spawn point
-        TODO choose a random spawn poitn for a **walker**        
+        
+        TODO choose a random spawn point for a **walker**        
         """
 
         self.walker_bp = self.blueprint_library.filter('0012')[0]
@@ -336,13 +352,13 @@ class CarlaWalkerEnv(Env):
 
         return self.observation
 
-    def step(self, action: np.ndarray):
+    def step(self, action):
         """
         apply action to walker and return observation, reward, done, info
 
         Parameters
         ----------
-        action : np.ndarray
+        action
             action of the walker
 
         Returns
@@ -360,7 +376,7 @@ class CarlaWalkerEnv(Env):
         carlawalkercontrol
         applies carla.WalkerControl https://carla.readthedocs.io/en/latest/python_api/
         """
-
+        
         logging.debug('taking step')
 
         # self.walker_last_location = self.walker.get_location()
@@ -377,11 +393,16 @@ class CarlaWalkerEnv(Env):
         else:
             unit_action = action
 
-        direction = carla.Vector3D(
-            x=float(unit_action[0]), y=float(unit_action[1]), z=0.0)
+        self.walker_direction = carla.Vector3D(
+            x=float(unit_action[0]), 
+            y=float(unit_action[1]), 
+            z=0.0
+            )
 
         walker_control = carla.WalkerControl(
-            direction, speed=self.max_walking_speed)
+            self.walker_direction, 
+            speed=self.max_walking_speed
+            )
 
         self.walker.apply_control(walker_control)
 
@@ -392,8 +413,15 @@ class CarlaWalkerEnv(Env):
 
         self.__reward_calculation()
 
-        if self.tick_count >= self.max_tick_count:
+        if self.dist_from_spawn2walker >= self.max_dist_start:
+            """go to done, if the walker walked far enough away from the spawn point"""
             self.done = True
+        elif self.tick_count >= self.max_tick_count:
+            """go to done, if max_tick_count is reached"""
+            self.done = True
+            
+            
+        if self.done:
             logging.debug('done')
 
         # slow down simulation in verbose mode
@@ -429,3 +457,23 @@ class CarlaWalkerEnv(Env):
         self.spectator.set_transform(self.spectator_transform)
 
     def close(self):
+        """if done, tidy up and destroy actors"""
+        logging.debug('closing environment')
+
+        # self.camera.destroy()
+        # TODO why does the camera needs to be destroyed?
+
+        # logging.debug('active actors: {}'.format(self.world.get_actors()))
+        logging.debug('listed actors: {}'.format(self.actor_list))
+        self.client.apply_batch([carla.command.DestroyActor(x)
+                                for x in self.actor_list])
+
+        # tick for changes to take effect
+        self.world.tick()
+
+        logging.debug('destroyed actors')
+
+        # self.settings.synchronous_mode = False  # Disable synchronous mode
+        # self.world.apply_settings(self.settings)
+
+        logging.debug('======== closed environment ========')
